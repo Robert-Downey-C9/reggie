@@ -14,9 +14,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @RestController
@@ -30,6 +32,8 @@ public class DishController {
     private DishFlavorService dishFlavorService;
     @Autowired
     private CategoryService categoryService;
+    @Autowired
+    private RedisTemplate redisTemplate;
 
     /**
      * 新增菜品
@@ -41,6 +45,14 @@ public class DishController {
         log.info("菜品信息：{}", dishDto.toString());
 
         dishService.saveWithFlavor(dishDto);
+
+        // 清理所有菜品数据
+        //Set keys = redisTemplate.keys("dish_*");
+        //redisTemplate.delete(keys);
+
+        // 清理某个菜品数据
+        String key = "dish_" + dishDto.getCategoryId() + "_1";
+        redisTemplate.delete(key);
 
         return R.success("菜品新增成功");
     }
@@ -113,6 +125,14 @@ public class DishController {
     @PutMapping
     public R<String> update(@RequestBody DishDto dishDto){
         log.info("菜品信息：{}", dishDto.toString());
+
+        // 清理所有菜品数据
+        //Set keys = redisTemplate.keys("dish_*");
+        //redisTemplate.delete(keys);
+
+        // 清理某个菜品数据
+        String key = "dish_" + dishDto.getCategoryId() + "_1";
+        redisTemplate.delete(key);
 
         dishService.updateWithFlavor(dishDto);
 

@@ -15,10 +15,12 @@ import com.itheima.service.DishService;
 import com.itheima.service.SetmealDishService;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Service
@@ -30,6 +32,8 @@ public class DishServiceImpl extends ServiceImpl<DishMapper, Dish> implements Di
     private SetmealDishService setmealDishService;
     @Autowired
     private CategoryService categoryService;
+    @Autowired
+    private RedisTemplate redisTemplate;
 
     /**
      * 新增菜品，同时保存对应的口味数据
@@ -160,12 +164,26 @@ public class DishServiceImpl extends ServiceImpl<DishMapper, Dish> implements Di
      */
     @Override
     public List<DishDto> showByCategoryId(Dish dish) {
+        List<DishDto> dishDtos = null;
+
+        // 构造一个key, dish_128738123012937_1
+        String key = "dish_" + dish.getCategoryId() + "_" + dish.getStatus();
+        
+        // 先查询Redis数据库
+        dishDtos = (List<DishDto>) redisTemplate.opsForValue().get(key);
+
+        if (dishDtos != null){
+            return dishDtos;
+        }
+
+
+
         LambdaQueryWrapper<Dish> lambdaQueryWrapper = new LambdaQueryWrapper<>();
         lambdaQueryWrapper.eq(dish.getCategoryId() != null, Dish::getCategoryId, dish.getCategoryId());
         lambdaQueryWrapper.eq(Dish::getStatus, dish.getStatus());
         // 通过分类id获取菜品信息
         List<Dish> list = this.list(lambdaQueryWrapper);
-        List<DishDto> dishDtos = list.stream().map((item)->{
+        dishDtos = list.stream().map((item)->{
             DishDto dishDto = new DishDto();
             BeanUtils.copyProperties(item, dishDto);
             Long id = item.getCategoryId();
@@ -186,6 +204,9 @@ public class DishServiceImpl extends ServiceImpl<DishMapper, Dish> implements Di
 
             return dishDto;
         }).collect(Collectors.toList());
+
+        // Redis不存在菜品数据，将数据缓存到Redis中
+        redisTemplate.opsForValue().set(key, dishDtos, 60, TimeUnit.MINUTES);
 
         return dishDtos;
     }
